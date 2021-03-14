@@ -63,12 +63,12 @@ class CD8TcellProjectSteppable(SteppableBasePy):
         
         // For E13
         
-        D = 0.2 ; // pixels/MCS
-        delta = 0.008 ; // 1/min
-        λlamR3 = 0.0 ; // M 1/min
-        lamR4 = 0.0 ; // M
-        lamT4 = 0.0 ; // 1/M
-        lam1 = 10E-12 ; // m 1/min
+        // D = 0.2 ; // pixels/MCS
+        // delta = 0.008 ; // 1/min
+        // lamR3 = 0.0 ; // M 1/min
+        // lamR4 = 0.0 ; // M
+        // lamT4 = 0.0 ; // 1/M
+        // lam1 = 10E-12 ; // m 1/min
         
         end"""
         
@@ -85,6 +85,7 @@ class CD8TcellProjectSteppable(SteppableBasePy):
         # self.field.IL2
         
         # IL2_secretor = self.get_field_secretor("IL2")
+        # in step()
         
         IL2_secretor = self.field.IL2
         
@@ -97,6 +98,7 @@ class CD8TcellProjectSteppable(SteppableBasePy):
 
                 cell.targetVolume = 250
                 cell.lambdaVolume = 10
+                
             else:
                 
                 cell.targetVolume = 25
@@ -111,9 +113,23 @@ class CD8TcellProjectSteppable(SteppableBasePy):
         
         self.timestep_sbml()
 
+        IL2_secretor = self.field.IL2
+        
         for cell in self.cell_list:
             # loop over cells to calculate secretion (2nd term PDE) 
-            if cell.type == cell.NAIVE
+            # ...
+            pass
+            
+        for cell in self.cell_list_by_type(self.NAIVE):
+            # naive -> PA on contact with APC
+            for neighbor, common_surface_area in self.get_cell_neighbor_data_list(cell):
+                if neighbor:
+                    if neighbor.type == self.APC:
+                        cell.type = 2
+
+            
+            
+                
             
     def finish(self):
         
