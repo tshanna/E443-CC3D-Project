@@ -108,16 +108,4 @@
 </Steppable>
 
 
-   
-   <Steppable Type="BlobInitializer">
-      
-      <!-- Initial layout of cells in the form of spherical (circular in 2D) blob -->
-      <Region>
-         <Center x="100" y="100" z="0"/>
-         <Radius>23</Radius>
-         <Gap>0</Gap>
-         <Width>7</Width>
-         <Types>Naive</Types>
-      </Region>
-   </Steppable>
 </CompuCell3D>

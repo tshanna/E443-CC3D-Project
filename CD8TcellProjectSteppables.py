@@ -2,6 +2,10 @@
 from cc3d.core.PySteppables import *
 import numpy as np
 import random
+import sys
+
+small_num = sys.float_info.min
+sec_per_mcs = 60
 
 class CD8TcellProjectSteppable(SteppableBasePy):
 
@@ -17,19 +21,11 @@ class CD8TcellProjectSteppable(SteppableBasePy):
         model_string = """
         
         E1: -> IR ; lamR1 * ( fAPC ) + ( lamR2 + muDIL2 ) * IRa - ( muAIL2 )*( IL2cm )* IR - ( kR * IR ) ;           // Non-activated IL2R
-        //E2: IR -> ;  kR * IR ;                                                                                     // Decay of Non-activated IL2R
-        E3: -> IRa ; ( muAIL2 )*( IL2cm )* IR - (muDIL2 * IRa) - ( kRa * IRa ) ;                                     // Activated IL2R
-        //E4: IRa -> ; kRa * IRa ;                                                                                   // Decay of Activated IL2R
-        E5: -> Tb ; lamT1 * ( fAPC ) + lamT2 * ( (Tb) / (lamT3 + Tb) ) * Tb - ( kT * Tb ) ;                          // Tbet
-        //E6: Tb -> ; kT * Tb ;                                                                                      // Decay of Tbet
-        E7: -> Fs ; lamF + ( muDF * Fsa ) - H * ( muAF * Tbcm * Fs ) - ( kF * Fs ) ;                                 // Nn-activated Fas
-        //E8: Fs -> ; kF * Fs ;                                                                                      // Decay of Fas
-        E9: -> Fsa ; H * ( muAF * Tbcm * Fs ) - ( muDF * Fsa ) - ( kFa * Fsa ) ;                                     // Activated Fas
-        //E10: Fsa -> ; kFa * Fsa ;                                                                                  // Decay of Fas
-        E11: -> C ; lamc1 * ( 1/ (1 + (lamc2*IRa) ) ) * ( 1/ (1 + (lamc3*fAPC) ) ) + ( lamc4 * Fsa ) - ( kC * C ) ;  // Caspase
-        //E12: C -> ; kC * C ;                                                                                       // Decay of Caspase
-        
-        // E13: -> IL2 ; D*IL2 + ( lamR3 * ( IRa/ ( lamR4 + IRa)) + (lam1*fAPC)) * ( 1/ (1 + (lamT4*Tb))) - delta*IL2 ;    // concentration of IL2
+        E2: -> IRa ; ( muAIL2 )*( IL2cm )* IR - (muDIL2 * IRa) - ( kRa * IRa ) ;                                     // Activated IL2R
+        E3: -> Tb ; lamT1 * ( fAPC ) + lamT2 * ( (Tb) / (lamT3 + Tb) ) * Tb - ( kT * Tb ) ;                          // Tbet
+        E4: -> Fs ; lamF + ( muDF * Fsa ) - H * ( muAF * Tbcm * Fs ) - ( kF * Fs ) ;                                 // Nn-activated Fas
+        E5: -> Fsa ; H * ( muAF * Tbcm * Fs ) - ( muDF * Fsa ) - ( kFa * Fsa ) ;                                     // Activated Fas
+        E6: -> C ; lamc1 * ( 1/ (1 + (lamc2*IRa) ) ) * ( 1/ (1 + (lamc3*fAPC) ) ) + ( lamc4 * Fsa ) - ( kC * C ) ;  // Caspase
         
         // Decay rates
         
@@ -61,43 +57,61 @@ class CD8TcellProjectSteppable(SteppableBasePy):
         
         lamF = 3.47E-5 ; // M 1/min
         
-        // For E13
+        // Initial conditions
         
-        // D = 0.2 ; // pixels/MCS
-        // delta = 0.008 ; // 1/min
-        // lamR3 = 0.0 ; // M 1/min
-        // lamR4 = 0.0 ; // M
-        // lamT4 = 0.0 ; // 1/M
-        // lam1 = 10E-12 ; // m 1/min
+        IL2cm = 0
+        fAPC = 0
+        Tbcm = 0
+        H = 1
         
-        //end"""
+        IR0 = 0
+        IR = IR0
+        IRa0 = 0
+        IRa = IRa0
+        Tb0 = 0
+        Tb = Tb0
+        Fs0 = 0
+        Fs = Fs0
+        Fsa0 = 0
+        Fsa = Fsa0
+        C0 = 0
+        C = C0
         
-        #options = {'relative': 1e-10, 'absolute': 1e-12}
-        #self.set_sbml_global_options(options)
+        """
         
-        # generate 3 random numbers between 1,33 inclusive
-        # put the 3 numbers in a list
+        i = 0
+        
+        while i < 33:
+            x1 = random.sample(range(0,201),1)
+            print(x1[0])
+            x = x1[0]
+            y1 = random.sample(range(0,201),1)
+            y = y1[0]
+            z = 1
+            
+            if self.cell_field[x,y,z] == self.MEDIUM:
+                cell = self.new_cell(self.NAIVE)
+                self.cell_field[x, y, z] = cell
+                i += 1
+        
         
         L = [3,11,20]
-
-        #L = random.sample(range(1,34),3)
-        
-        # self.field.IL2
-        
-        # IL2_secretor = self.get_field_secretor("IL2")
-        # in step()
-        
-        IL2_secretor = self.field.IL2
         
         for cell in self.cell_list:
             print(cell.id)
             if cell.id in L:
                 cell.type = self.APC
+                
+                if cell.type == self.APC:
 
-            if cell.type == self.APC:
-
-                cell.targetVolume = 250
-                cell.lambdaVolume = 10
+                    cell.targetVolume = 250
+                    cell.lambdaVolume = 10
+                    
+                    life = random.sample(range(32,41),1)
+                    
+                    time = life[0] * sec_per_mcs
+                    
+                    cell.dict['lifespan'] = time
                 
             else:
                 
@@ -111,38 +125,57 @@ class CD8TcellProjectSteppable(SteppableBasePy):
 
     def step(self,mcs):
         
-        self.timestep_sbml()
-
-        IL2_secretor = get_field_secretor("IL2")
+        IL2_secretor = self.get_field_secretor('IL2')
         
         lamR3 = 0.0
         lamR4 = 0.0
         lam1 = 1E-12
         lamT4 = 0.0
         
-        for cell in self.cell_list:
-            # calculate f(APC)
-            fAPC = 
+        # death of APC
+        for cell in self.cell_list_by_type(self.APC):
             
-            # second term PDE
-            secrete = ( lamR3*(( cell.sbml.dp['E3'] )/( lamR4 + cell.sbml.dp['E3'] )) + lam1 * fAPC ) * ( 1 / (1 + lamT4 * cell.sbml.dp['E5']) )
-            
-            for cell in self.cell_list_by_type(self.NAIVE):
+            if mcs >= cell.dict['lifespan']:
                 
-                # when APC and Naive come in contact, naive -> PA
-                for neighbor, common_surface_area in self.get_cell_neighbor_data_list(cell):
-                    if neighbor:
-                        if neighbor.type == self.APC:
-                            cell.type = 2
-                            
+                cell.targetVolume = 0
+        
+        for cell in self.cell_list_by_type(self.NAIVE, self.EFFECTOR, self.PREACTIVATED, self.ACTIVATED):
+            
+            il2_cm = IL2_secretor.amountSeenByCell(cell)
+            
+            fAPC = 0
+            for neighbor, common_surface_area in self.get_cell_neighbor_data_list(cell):
+                
+                if neighbor:
+                    if neighbor.type == self.APC:
+                        fAPC += 1
+            
+            #update ode
+            cell.sbml.dp['IL2cm'] = il2_cm
+            cell.sbml.dp['fAPC'] = fAPC
+            
+            sbml_simulator = self.get_sbml_simulator(model_name='dp', cell=cell)
+
+            sbml_simulator.timestep()
+            
+            # Naive -> PA
+            if cell.type == self.NAIVE and fAPC > 0:
+                
+                cell.type = self.cell_type.Preactivated
+            
+            if cell.type == self.PREACTIVATED:
+                
+                if il2_cm > 7:
+                    cell.type = self.ACTIVATED
+
+            # uptake of IL2 and threshold for preactivated -> activated
+
+            # second term PDE
+            secrete = ( lamR3*(( cell.sbml.dp['IRa'] )/( lamR4 + cell.sbml.dp['IRa'] + small_num)) + lam1 * fAPC ) * ( 1 / (1 + lamT4 * cell.sbml.dp['Tb']) )
+            
             # secretion of IL2 by T cells            
             if cell.type is not 1 or 4:
                 IL2_secretor.secreteOutsideCellAtBoundary(cell, secrete)
-                
-            # uptake of IL2 and threshold for preactivated -> activated
-            if cell.type == 2:
-                pass
-                
             
     def finish(self):
         
