@@ -72,7 +72,6 @@
    
 </Plugin>
 
-
 <Steppable Type="DiffusionSolverFE">
    
    <!-- Specification of PDE solvers -->
@@ -106,6 +105,19 @@
    </DiffusionField>
 
 </Steppable>
+
+<Plugin Name="ExternalPotential">
+   
+   <!-- External force applied to cell. Each cell type has different force. -->
+   <!-- For more flexible specification of the constraint (done in Python) please use ExternalPotential plugin without specifying per-type parameters -->
+   <!-- Algorithm options are: PixelBased, CenterOfMassBased -->
+   <!-- <Algorithm>PixelBased</Algorithm> -->
+   <!-- <ExternalPotentialParameters CellType="APC" x="-0.5" y="0.0" z="0.0"/> -->
+   <!-- <ExternalPotentialParameters CellType="Preactivated" x="-0.5" y="0.0" z="0.0"/> -->
+   <!-- <ExternalPotentialParameters CellType="Activated" x="-0.5" y="0.0" z="0.0"/> -->
+   <!-- <ExternalPotentialParameters CellType="Naive" x="-0.5" y="0.0" z="0.0"/> -->
+   <!-- <ExternalPotentialParameters CellType="Effector" x="-0.5" y="0.0" z="0.0"/> -->
+</Plugin>
 
 
 </CompuCell3D>

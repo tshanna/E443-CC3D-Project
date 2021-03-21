@@ -3,6 +3,7 @@ from cc3d.core.PySteppables import *
 import numpy as np
 import random
 import sys
+import math
 
 small_num = sys.float_info.min
 sec_per_mcs = 60
@@ -89,7 +90,7 @@ class CD8TcellProjectSteppable(SteppableBasePy):
             y = y1[0]
             z = 1
             
-            if self.cell_field[x,y,z] == self.MEDIUM:
+            if self.cell_field[x,y,z] is None:
                 cell = self.new_cell(self.NAIVE)
                 self.cell_field[x, y, z] = cell
                 i += 1
@@ -112,11 +113,32 @@ class CD8TcellProjectSteppable(SteppableBasePy):
                     time = life[0] * sec_per_mcs
                     
                     cell.dict['lifespan'] = time
+                    
+                    n = random.uniform(-1,1)
+                    x_temp = math.cos(n)
+                    y_temp = math.sin(n)
+                    
+                    x = 0.4*(x_temp*x_temp)
+                    y = 0.4*(y_temp*y_temp)
+                    
+                    cell.lambdaVecX = x
+                    cell.lambdaVecY = y
                 
             else:
                 
                 cell.targetVolume = 25
                 cell.lambdaVolume = 10
+                
+                n = random.uniform(-1,1)
+                x_temp = math.cos(n)
+                y_temp = math.sin(n)
+                
+                x = 3.0*(x_temp*x_temp)
+                y = 3.0*(y_temp*y_temp)
+                
+                cell.lambdaVecX = x
+                cell.lambdaVecY = y
+                
                 self.add_antimony_to_cell(model_string=model_string,
                                   model_name='dp',
                                   cell=cell,
@@ -132,14 +154,36 @@ class CD8TcellProjectSteppable(SteppableBasePy):
         lam1 = 1E-12
         lamT4 = 0.0
         
+        
+        
         # death of APC
         for cell in self.cell_list_by_type(self.APC):
+            
+            n = random.uniform(-1,1)
+            x_temp = math.cos(n)
+            y_temp = math.sin(n)
+            
+            x = 0.4*(x_temp*x_temp)
+            y = 0.4*(y_temp*y_temp)
+            
+            cell.lambdaVecX = x
+            cell.lambdaVecY = y
             
             if mcs >= cell.dict['lifespan']:
                 
                 cell.targetVolume = 0
         
         for cell in self.cell_list_by_type(self.NAIVE, self.EFFECTOR, self.PREACTIVATED, self.ACTIVATED):
+            
+            n = random.uniform(-1,1)
+            x_temp = math.cos(n)
+            y_temp = math.sin(n)
+            
+            x = 3.0*(x_temp*x_temp)
+            y = 3.0*(y_temp*y_temp)
+            
+            cell.lambdaVecX = x
+            cell.lambdaVecY = y
             
             il2_cm = IL2_secretor.amountSeenByCell(cell)
             
@@ -163,18 +207,17 @@ class CD8TcellProjectSteppable(SteppableBasePy):
                 
                 cell.type = self.cell_type.Preactivated
             
+            # uptake of IL2 and threshold for preactivated -> activated
             if cell.type == self.PREACTIVATED:
                 
                 if il2_cm > 7:
                     cell.type = self.ACTIVATED
 
-            # uptake of IL2 and threshold for preactivated -> activated
-
             # second term PDE
             secrete = ( lamR3*(( cell.sbml.dp['IRa'] )/( lamR4 + cell.sbml.dp['IRa'] + small_num)) + lam1 * fAPC ) * ( 1 / (1 + lamT4 * cell.sbml.dp['Tb']) )
             
             # secretion of IL2 by T cells            
-            if cell.type is not 1 or 4:
+            if cell.type is not self.APC or self.NAIVE:
                 IL2_secretor.secreteOutsideCellAtBoundary(cell, secrete)
             
     def finish(self):
