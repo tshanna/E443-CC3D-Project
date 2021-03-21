@@ -7,6 +7,7 @@ import math
 
 small_num = sys.float_info.min
 sec_per_mcs = 60
+pi = math.pi
 
 class CD8TcellProjectSteppable(SteppableBasePy):
 
@@ -114,10 +115,13 @@ class CD8TcellProjectSteppable(SteppableBasePy):
                     
                     cell.dict['lifespan'] = time
                     
-                    n = random.uniform(-1,1)
+                    # cell motility for APC ~0.1μm/mcs
+                    # I calculated this to be about 0.4 pixel/mcs
+                    n = random.uniform(-pi,pi)
                     x_temp = math.cos(n)
                     y_temp = math.sin(n)
                     
+                    # ensure the movement vector is always 0.4
                     x = 0.4*(x_temp*x_temp)
                     y = 0.4*(y_temp*y_temp)
                     
@@ -129,10 +133,13 @@ class CD8TcellProjectSteppable(SteppableBasePy):
                 cell.targetVolume = 25
                 cell.lambdaVolume = 10
                 
-                n = random.uniform(-1,1)
+                # cell motility for T-cells ~0.75μm/mcs
+                # I calculated this to be about 0.4 pixel/mcs
+                n = random.uniform(-pi,pi)
                 x_temp = math.cos(n)
                 y_temp = math.sin(n)
-                
+                           
+                # ensure the movement vector is always 3.0 for T-cells
                 x = 3.0*(x_temp*x_temp)
                 y = 3.0*(y_temp*y_temp)
                 
@@ -159,7 +166,7 @@ class CD8TcellProjectSteppable(SteppableBasePy):
         # death of APC
         for cell in self.cell_list_by_type(self.APC):
             
-            n = random.uniform(-1,1)
+            n = random.uniform(-pi,pi)
             x_temp = math.cos(n)
             y_temp = math.sin(n)
             
@@ -175,7 +182,7 @@ class CD8TcellProjectSteppable(SteppableBasePy):
         
         for cell in self.cell_list_by_type(self.NAIVE, self.EFFECTOR, self.PREACTIVATED, self.ACTIVATED):
             
-            n = random.uniform(-1,1)
+            n = random.uniform(-pi,pi)
             x_temp = math.cos(n)
             y_temp = math.sin(n)
             
@@ -184,6 +191,11 @@ class CD8TcellProjectSteppable(SteppableBasePy):
             
             cell.lambdaVecX = x
             cell.lambdaVecY = y
+            
+            if cell.type == self.PREACTIVATED:
+                
+                cell.lambdaVecX = 0.0
+                cell.lambdaVecY = 0.0
             
             il2_cm = IL2_secretor.amountSeenByCell(cell)
             
