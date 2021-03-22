@@ -5,8 +5,11 @@ import random
 import sys
 import math
 
+ODE_vars = ['IR','IRa','Tb','Fs','Fsa','C']
+
 small_num = sys.float_info.min
 sec_per_mcs = 60
+Mvox = 1E-11
 pi = math.pi
 
 class CD8TcellProjectSteppable(SteppableBasePy):
@@ -61,10 +64,11 @@ class CD8TcellProjectSteppable(SteppableBasePy):
         
         // Initial conditions
         
+        secrete = 0
         IL2cm = 0
         fAPC = 0
         Tbcm = 0
-        H = 1
+        H = 0
         
         IR0 = 0
         IR = IR0
@@ -81,8 +85,8 @@ class CD8TcellProjectSteppable(SteppableBasePy):
         
         """
         
+        #initialize cells throughout the domain
         i = 0
-        
         while i < 33:
             x1 = random.sample(range(0,201),1)
             print(x1[0])
@@ -91,6 +95,7 @@ class CD8TcellProjectSteppable(SteppableBasePy):
             y = y1[0]
             z = 1
             
+            # make sure cells are not overwriting eachother
             if self.cell_field[x,y,z] is None:
                 cell = self.new_cell(self.NAIVE)
                 self.cell_field[x, y, z] = cell
@@ -101,6 +106,7 @@ class CD8TcellProjectSteppable(SteppableBasePy):
         
         for cell in self.cell_list:
             print(cell.id)
+            # initialize the 3 starting APC 
             if cell.id in L:
                 cell.type = self.APC
                 
@@ -134,18 +140,18 @@ class CD8TcellProjectSteppable(SteppableBasePy):
         lamR4 = 0.0
         lam1 = 1E-12
         lamT4 = 0.0
-        
-        
-        
+          
         # death of APC
         for cell in self.cell_list_by_type(self.APC):
             
-            if mcs % 10 == 0:
+            # movement for APC updated every 90 minutes (mcs)
+            if mcs % 90 == 0:
                 n = random.uniform(-pi,pi)
-                
+                # randomize if movement vector is positive or negative
                 sign = random.uniform(-3,3)
                 abs_sign = abs(sign)
                 
+                # ensure there is no divide by 0
                 if sign == 0:
                     sign = sign + 1
                     abs_sign = abs(sign)
@@ -153,24 +159,29 @@ class CD8TcellProjectSteppable(SteppableBasePy):
                 x_temp = math.cos(n)
                 y_temp = math.sin(n)
                 
-                x = 0.4*(x_temp*x_temp)*(sign/abs_sign)
-                y = 0.4*(y_temp*y_temp)*(sign/abs_sign)
+                # r = 20 for APC
+                x = 20.0*(x_temp*x_temp)*(sign/abs_sign)
+                y = 20.0*(y_temp*y_temp)*(sign/abs_sign)
 
                 cell.lambdaVecX = x
                 cell.lambdaVecY = y
             
+            # APC death after lifespan is reached
             if mcs >= cell.dict['lifespan']:
                 
                 cell.targetVolume = 0
         
         for cell in self.cell_list_by_type(self.NAIVE, self.EFFECTOR, self.PREACTIVATED, self.ACTIVATED):
             
-            if mcs % 10 == 0:
+            # movement for T cells updated every 90 minutes (mcs)
+            if mcs % 90 == 0:
                 n = random.uniform(-pi,pi)
                 
+                # randomize if movement vector is positive or negative
                 sign = random.uniform(-3,3)
                 abs_sign = abs(sign)
                 
+                # ensure there is no divide by 0
                 if sign == 0:
                     sign = sign + 1
                     abs_sign = abs(sign)
@@ -178,19 +189,15 @@ class CD8TcellProjectSteppable(SteppableBasePy):
                 x_temp = math.cos(n)
                 y_temp = math.sin(n)
                 
-                x = 3.0*(x_temp*x_temp)*(sign/abs_sign)
-                y = 3.0*(y_temp*y_temp)*(sign/abs_sign)
+                x = 150.0*(x_temp*x_temp)*(sign/abs_sign)
+                y = 150.0*(y_temp*y_temp)*(sign/abs_sign)
                 
                 cell.lambdaVecX = x
-                cell.lambdaVecY = y
-            
-            if cell.type == self.PREACTIVATED:
-                
-                cell.lambdaVecX = 0.0
-                cell.lambdaVecY = 0.0
+                cell.lambdaVecY = y            
             
             il2_cm = IL2_secretor.amountSeenByCell(cell)
             
+            # count amount of APC a T cell is in contact with
             fAPC = 0
             for neighbor, common_surface_area in self.get_cell_neighbor_data_list(cell):
                 
@@ -198,12 +205,20 @@ class CD8TcellProjectSteppable(SteppableBasePy):
                     if neighbor.type == self.APC:
                         fAPC += 1
             
+            # keep track of effector-effector or effector-activated contacts (heaviside function H)
+            if cell.type == self.EFFECTOR:
+                for neighbor, common_surface_area in self.get_cell_neighbor_data_list(cell):
+                    
+                    if neighbor:
+                        if neighbor.type == self.EFFECTOR or self.ACTIVATED:
+                            cell.sbml.dp['H'] = 1
+            
             #update ode
             cell.sbml.dp['IL2cm'] = il2_cm
             cell.sbml.dp['fAPC'] = fAPC
             
+            # step the simulation
             sbml_simulator = self.get_sbml_simulator(model_name='dp', cell=cell)
-
             sbml_simulator.timestep()
             
             # Naive -> PA
@@ -211,18 +226,23 @@ class CD8TcellProjectSteppable(SteppableBasePy):
                 
                 cell.type = self.cell_type.Preactivated
 
-            # uptake of IL2 and threshold for preactivated -> activated
+            # monitor IL2 threshold for preactivated -> activated
             if cell.type == self.PREACTIVATED:
                 
-                if il2_cm > 7:
+                cell.lambdaVecX = 0.0
+                cell.lambdaVecY = 0.0
+                
+                # if threshold reached
+                if cell.sbml.dp['IL2cm'] > 7*Mvox:
                     cell.type = self.ACTIVATED
 
             # second term PDE
             secrete = ( lamR3*(( cell.sbml.dp['IRa'] )/( lamR4 + cell.sbml.dp['IRa'] + small_num)) + lam1 * fAPC ) * ( 1 / (1 + lamT4 * cell.sbml.dp['Tb']) )
+            cell.sbml.dp['secrete'] = secrete
             
             # secretion of IL2 by T cells            
             if cell.type is not self.APC or self.NAIVE:
-                IL2_secretor.secreteOutsideCellAtBoundary(cell, secrete)
+                IL2_secretor.secreteOutsideCellAtBoundary(cell, cell.sbml.dp['secrete'])
             
     def finish(self):
         
@@ -247,7 +267,7 @@ class MitosisSteppable(MitosisSteppableBase):
             # Effector and activated t cells divide every ~8 hours
             if mcs % 480 == 0:
                 cells_to_divide.append(cell)
-
+        
         for cell in cells_to_divide:
 
             self.divide_cell_random_orientation(cell)
@@ -262,10 +282,15 @@ class MitosisSteppable(MitosisSteppableBase):
         # one cell inherits k = [0.7,1.0] fraction of parent cell
         # other cell has 2 - k 
         
-        # k = random.uniform(0.7,1.0)
         # self.parent_cell.targetVolume = self.cell.volume * k                 
 
-        self.clone_parent_2_child()            
+        self.clone_parent_2_child()    
+
+        for v in ODE_vars:
+            k = random.uniform(0.7,1.0)
+            x = self.parent_cell.sbml.dp[v]
+            self.child_cell.sbml.dp[v] = x*(2-k)
+            self.parent_cell.sbml.dp[v] = x*k
 
         # for more control of what gets copied from parent to child use cloneAttributes function
         # self.clone_attributes(source_cell=self.parent_cell, target_cell=self.child_cell, no_clone_key_dict_list=[attrib1, attrib2]) 
