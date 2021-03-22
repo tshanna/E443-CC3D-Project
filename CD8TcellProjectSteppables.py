@@ -114,37 +114,11 @@ class CD8TcellProjectSteppable(SteppableBasePy):
                     time = life[0] * sec_per_mcs
                     
                     cell.dict['lifespan'] = time
-                    
-                    # cell motility for APC ~0.1μm/mcs
-                    # I calculated this to be about 0.4 pixel/mcs
-                    n = random.uniform(-pi,pi)
-                    x_temp = math.cos(n)
-                    y_temp = math.sin(n)
-                    
-                    # ensure the movement vector is always 0.4
-                    x = 0.4*(x_temp*x_temp)
-                    y = 0.4*(y_temp*y_temp)
-                    
-                    cell.lambdaVecX = x
-                    cell.lambdaVecY = y
                 
             else:
                 
                 cell.targetVolume = 25
                 cell.lambdaVolume = 10
-                
-                # cell motility for T-cells ~0.75μm/mcs
-                # I calculated this to be about 0.4 pixel/mcs
-                n = random.uniform(-pi,pi)
-                x_temp = math.cos(n)
-                y_temp = math.sin(n)
-                           
-                # ensure the movement vector is always 3.0 for T-cells
-                x = 3.0*(x_temp*x_temp)
-                y = 3.0*(y_temp*y_temp)
-                
-                cell.lambdaVecX = x
-                cell.lambdaVecY = y
                 
                 self.add_antimony_to_cell(model_string=model_string,
                                   model_name='dp',
@@ -166,15 +140,24 @@ class CD8TcellProjectSteppable(SteppableBasePy):
         # death of APC
         for cell in self.cell_list_by_type(self.APC):
             
-            n = random.uniform(-pi,pi)
-            x_temp = math.cos(n)
-            y_temp = math.sin(n)
-            
-            x = 0.4*(x_temp*x_temp)
-            y = 0.4*(y_temp*y_temp)
-            
-            cell.lambdaVecX = x
-            cell.lambdaVecY = y
+            if mcs % 10 == 0:
+                n = random.uniform(-pi,pi)
+                
+                sign = random.uniform(-3,3)
+                abs_sign = abs(sign)
+                
+                if sign == 0:
+                    sign = sign + 1
+                    abs_sign = abs(sign)
+                
+                x_temp = math.cos(n)
+                y_temp = math.sin(n)
+                
+                x = 0.4*(x_temp*x_temp)*(sign/abs_sign)
+                y = 0.4*(y_temp*y_temp)*(sign/abs_sign)
+
+                cell.lambdaVecX = x
+                cell.lambdaVecY = y
             
             if mcs >= cell.dict['lifespan']:
                 
@@ -182,15 +165,24 @@ class CD8TcellProjectSteppable(SteppableBasePy):
         
         for cell in self.cell_list_by_type(self.NAIVE, self.EFFECTOR, self.PREACTIVATED, self.ACTIVATED):
             
-            n = random.uniform(-pi,pi)
-            x_temp = math.cos(n)
-            y_temp = math.sin(n)
-            
-            x = 3.0*(x_temp*x_temp)
-            y = 3.0*(y_temp*y_temp)
-            
-            cell.lambdaVecX = x
-            cell.lambdaVecY = y
+            if mcs % 10 == 0:
+                n = random.uniform(-pi,pi)
+                
+                sign = random.uniform(-3,3)
+                abs_sign = abs(sign)
+                
+                if sign == 0:
+                    sign = sign + 1
+                    abs_sign = abs(sign)
+                
+                x_temp = math.cos(n)
+                y_temp = math.sin(n)
+                
+                x = 3.0*(x_temp*x_temp)*(sign/abs_sign)
+                y = 3.0*(y_temp*y_temp)*(sign/abs_sign)
+                
+                cell.lambdaVecX = x
+                cell.lambdaVecY = y
             
             if cell.type == self.PREACTIVATED:
                 
@@ -270,7 +262,8 @@ class MitosisSteppable(MitosisSteppableBase):
         # one cell inherits k = [0.7,1.0] fraction of parent cell
         # other cell has 2 - k 
         
-        self.parent_cell.targetVolume /= 2.0                  
+        # k = random.uniform(0.7,1.0)
+        # self.parent_cell.targetVolume = self.cell.volume * k                 
 
         self.clone_parent_2_child()            
 
