@@ -9,7 +9,7 @@ ODE_vars = ['IR','IRa','Tb','Fs','Fsa','C']
 
 small_num = sys.float_info.min
 sec_per_mcs = 60
-Mvox = 1E-11
+Mvox = 1E-15 # 1E-15 by calculation
 pi = math.pi
 
 class CD8TcellProjectSteppable(SteppableBasePy):
@@ -195,8 +195,6 @@ class CD8TcellProjectSteppable(SteppableBasePy):
                 cell.lambdaVecX = x
                 cell.lambdaVecY = y            
             
-            il2_cm = IL2_secretor.amountSeenByCell(cell)
-            
             # count amount of APC a T cell is in contact with
             fAPC = 0
             for neighbor, common_surface_area in self.get_cell_neighbor_data_list(cell):
@@ -212,10 +210,26 @@ class CD8TcellProjectSteppable(SteppableBasePy):
                     if neighbor:
                         if neighbor.type == self.EFFECTOR or self.ACTIVATED:
                             cell.sbml.dp['H'] = 1
+                        else:
+                            cell.sbml.dp['H'] = 0
+            
+            il2_cm = IL2_secretor.amountSeenByCell(cell)
             
             #update ode
             cell.sbml.dp['IL2cm'] = il2_cm
             cell.sbml.dp['fAPC'] = fAPC
+            
+            # second term PDE
+            secrete = ( lamR3*(( cell.sbml.dp['IRa'] )/( lamR4 + cell.sbml.dp['IRa'] + small_num)) + lam1 * fAPC ) * ( 1 / (1 + lamT4 * cell.sbml.dp['Tb']) )
+            cell.sbml.dp['secrete'] = secrete
+                       
+            if cell.type is not self.NAIVE:
+                # secretion of IL2 by T cells 
+                IL2_secretor.secreteOutsideCellAtBoundary(cell, cell.sbml.dp['secrete'])
+                
+                # Caspase threshold for effector, activated, preactivated
+                # if cell.sbml.dp['C'] > 2.63*Mvox:
+                   # cell.targetVolume = 0.0
             
             # step the simulation
             sbml_simulator = self.get_sbml_simulator(model_name='dp', cell=cell)
@@ -235,14 +249,20 @@ class CD8TcellProjectSteppable(SteppableBasePy):
                 # if threshold reached
                 if cell.sbml.dp['IL2cm'] > 7*Mvox:
                     cell.type = self.ACTIVATED
+            
+            if cell.type == self.ACTIVATED:
+                if cell.sbml.dp['Tb'] > 40 * Mvox:
+                    cell.type = self.cell_type.Effector
+            
 
+            ###### Moved to line 222
             # second term PDE
-            secrete = ( lamR3*(( cell.sbml.dp['IRa'] )/( lamR4 + cell.sbml.dp['IRa'] + small_num)) + lam1 * fAPC ) * ( 1 / (1 + lamT4 * cell.sbml.dp['Tb']) )
-            cell.sbml.dp['secrete'] = secrete
+            # secrete = ( lamR3*(( cell.sbml.dp['IRa'] )/( lamR4 + cell.sbml.dp['IRa'] + small_num)) + lam1 * fAPC ) * ( 1 / (1 + lamT4 * cell.sbml.dp['Tb']) )
+            # cell.sbml.dp['secrete'] = secrete
             
             # secretion of IL2 by T cells            
-            if cell.type is not self.APC or self.NAIVE:
-                IL2_secretor.secreteOutsideCellAtBoundary(cell, cell.sbml.dp['secrete'])
+            # if cell.type is not self.NAIVE:
+                # IL2_secretor.secreteOutsideCellAtBoundary(cell, cell.sbml.dp['secrete'])
             
     def finish(self):
         
