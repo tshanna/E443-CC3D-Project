@@ -9,7 +9,9 @@ ODE_vars = ['IR','IRa','Tb','Fs','Fsa','C']
 
 small_num = sys.float_info.min
 sec_per_mcs = 60
-Mvox = 1E-15 # 1E-15 by calculation
+# 1E-11 # 1E-15 by calculation # 1.0 to remove
+Mvox = 5E-12
+#Mvox = 1.0 
 pi = math.pi
 
 class CD8TcellProjectSteppable(SteppableBasePy):
@@ -134,7 +136,14 @@ class CD8TcellProjectSteppable(SteppableBasePy):
 
     def step(self,mcs):
         
+        # field = self.field.CHEMICAL_FIELD_NAME
+        
+        # for cell in self.cell_list:
+        # concentrationAtCOM = IL2[int(cell.xCOM), int(cell.yCOM), int(cell.zCOM)]
+    
         IL2_secretor = self.get_field_secretor('IL2')
+        
+        IL2 = self.field.IL2
         
         lamR3 = 0.0
         lamR4 = 0.0
@@ -206,14 +215,17 @@ class CD8TcellProjectSteppable(SteppableBasePy):
             # keep track of effector-effector or effector-activated contacts (heaviside function H)
             if cell.type == self.EFFECTOR:
                 for neighbor, common_surface_area in self.get_cell_neighbor_data_list(cell):
-                    
                     if neighbor:
                         if neighbor.type == self.EFFECTOR or self.ACTIVATED:
                             cell.sbml.dp['H'] = 1
                         else:
                             cell.sbml.dp['H'] = 0
             
-            il2_cm = IL2_secretor.amountSeenByCell(cell)
+            # il2_cm = IL2_secretor.amountSeenByCell(cell)/cell.volume
+            
+            # concentrationAtCOM = IL2[int(cell.xCOM), int(cell.yCOM), int(cell.zCOM)]
+            il2_cm = IL2[int(cell.xCOM), int(cell.yCOM), int(cell.zCOM)]
+            # print("IL2CM VALUE IS:", il2_cm)
             
             #update ode
             cell.sbml.dp['IL2cm'] = il2_cm
@@ -222,8 +234,9 @@ class CD8TcellProjectSteppable(SteppableBasePy):
             # second term PDE
             secrete = ( lamR3*(( cell.sbml.dp['IRa'] )/( lamR4 + cell.sbml.dp['IRa'] + small_num)) + lam1 * fAPC ) * ( 1 / (1 + lamT4 * cell.sbml.dp['Tb']) )
             cell.sbml.dp['secrete'] = secrete
-                       
-            if cell.type is not self.NAIVE:
+            
+            #if cell.type is not self.cell_type.Naive:
+            if cell.type is self.PREACTIVATED or self.ACTIVATED or self.EFFECTOR:
                 # secretion of IL2 by T cells 
                 IL2_secretor.secreteOutsideCellAtBoundary(cell, cell.sbml.dp['secrete'])
                 
@@ -240,16 +253,17 @@ class CD8TcellProjectSteppable(SteppableBasePy):
                 
                 cell.type = self.cell_type.Preactivated
 
-            # monitor IL2 threshold for preactivated -> activated
+            # Preactivated cells stop moving until activated
             if cell.type == self.PREACTIVATED:
                 
                 cell.lambdaVecX = 0.0
                 cell.lambdaVecY = 0.0
                 
-                # if threshold reached
-                if cell.sbml.dp['IL2cm'] > 7*Mvox:
-                    cell.type = self.ACTIVATED
+            # if IL2 threshold reached, PA -> A
+            if cell.sbml.dp['IL2cm'] > 7*Mvox:
+                cell.type = self.ACTIVATED
             
+            # if Tbet threshold reached, A -> E
             if cell.type == self.ACTIVATED:
                 if cell.sbml.dp['Tb'] > 40 * Mvox:
                     cell.type = self.cell_type.Effector
