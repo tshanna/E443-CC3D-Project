@@ -15,6 +15,8 @@
       <Steps>100000</Steps>
       <Temperature>10.0</Temperature>
       <NeighborOrder>1</NeighborOrder>
+      <Boundary_x>Periodic</Boundary_x>
+      <Boundary_y>Periodic</Boundary_y>
    </Potts>
    
    <Plugin Name="CellType">
@@ -61,12 +63,17 @@
    <Energy Type1="Naive" Type2="Naive">100.0</Energy>
    <Energy Type1="Naive" Type2="Effector">100.0</Energy>
    <Energy Type1="Effector" Type2="Effector">100.0</Energy>
-   <NeighborOrder>1</NeighborOrder>
+   <NeighborOrder>2</NeighborOrder>
 </Plugin>
 
 <Plugin Name="Volume">
 
 </Plugin>
+
+<Plugin Name="Surface">
+
+</Plugin>
+
 
 <Plugin Name="Secretion">
    

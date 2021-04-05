@@ -10,8 +10,8 @@ ODE_vars = ['IR','IRa','Tb','Fs','Fsa','C']
 small_num = sys.float_info.min
 sec_per_mcs = 60
 # 1E-11 # 1E-15 by calculation # 1.0 to remove
-Mvox = 5E-12
-#Mvox = 1.0 
+#Mvox = 1E-15
+Mvox = 1.0 
 pi = math.pi
 
 class CD8TcellProjectSteppable(SteppableBasePy):
@@ -21,6 +21,23 @@ class CD8TcellProjectSteppable(SteppableBasePy):
         SteppableBasePy.__init__(self,frequency)
 
     def start(self):
+        
+        
+        self.plot_win = self.add_new_plot_window(title='Concentrations',
+                                                 x_axis_title='MonteCarlo Step (MCS)',
+                                                 y_axis_title='Concentration', x_scale_type='linear', y_scale_type='linear',
+                                                 grid=False,config_options={'legend': True})
+        
+     
+        self.plot_win.add_plot("IRa", style='Dots', color='green', size=4)
+        self.plot_win.add_plot("IL2", style='Dots', color='red', size=4)
+        self.plot_win.add_plot("Tb", style='Dots', color='yellow', size=4)
+        self.plot_win.add_plot("Casp", style='Dots', color='cyan', size=4)
+        #self.plot_win.add_plot("IL2cm", style='Dots', color='purple', size=4)
+        self.plot_win.add_plot("fAPC", style='Dots', color='blue', size=4)
+        self.plot_win.add_plot("IR", style='Dots', color='purple', size=4)        
+
+        
         """
         any code in the start function runs before MCS=0
         """
@@ -33,6 +50,8 @@ class CD8TcellProjectSteppable(SteppableBasePy):
         E4: -> Fs ; lamF + ( muDF * Fsa ) - H * ( muAF * Tbcm * Fs ) - ( kF * Fs ) ;                                 // Nn-activated Fas
         E5: -> Fsa ; H * ( muAF * Tbcm * Fs ) - ( muDF * Fsa ) - ( kFa * Fsa ) ;                                     // Activated Fas
         E6: -> C ; lamc1 * ( 1/ (1 + (lamc2*IRa) ) ) * ( 1/ (1 + (lamc3*fAPC) ) ) + ( lamc4 * Fsa ) - ( kC * C ) ;  // Caspase
+        E7: -> IL2cm ; 0.0 ;
+        E8: -> fAPC ; 0.0 ;
         
         // Decay rates
         
@@ -86,6 +105,7 @@ class CD8TcellProjectSteppable(SteppableBasePy):
         C = C0
         
         """
+        lamR3 = 1E-12
         
         #initialize cells throughout the domain
         i = 0
@@ -105,9 +125,11 @@ class CD8TcellProjectSteppable(SteppableBasePy):
         
         
         L = [3,11,20]
+        self.cellOI = None
         
         for cell in self.cell_list:
             print(cell.id)
+
             # initialize the 3 starting APC 
             if cell.id in L:
                 cell.type = self.APC
@@ -127,6 +149,7 @@ class CD8TcellProjectSteppable(SteppableBasePy):
                 
                 cell.targetVolume = 25
                 cell.lambdaVolume = 10
+                cell.dict['lamR3'] = lamR3
                 
                 self.add_antimony_to_cell(model_string=model_string,
                                   model_name='dp',
@@ -135,6 +158,22 @@ class CD8TcellProjectSteppable(SteppableBasePy):
                 
 
     def step(self,mcs):
+        
+        if not self.cellOI:
+            for cell in self.cell_list_by_type(self.PREACTIVATED):
+                if cell.sbml.dp['fAPC'] > 0:
+                    self.cellOI = cell
+                    break
+        
+        if self.cellOI:
+            if not mcs % 50 :
+            #for cell in self.cell_list_by_type(self.PREACTIVATED,self.ACTIVATED):
+                self.plot_win.add_data_point("IRa", mcs, self.cellOI.sbml.dp['IRa'])
+                self.plot_win.add_data_point("IR", mcs, self.cellOI.sbml.dp['IR'])
+                self.plot_win.add_data_point("Tb", mcs, self.cellOI.sbml.dp['Tb'])
+                self.plot_win.add_data_point("C", mcs, self.cellOI.sbml.dp['C'])
+                #self.plot_win.add_data_point("Il2cm", mcs, self.cellOI.sbml.dp['IL2cm'])
+                #self.plot_win.add_data_point("fAPC", mcs, cell.sbml.dp['fAPC'])        
         
         # field = self.field.CHEMICAL_FIELD_NAME
         
@@ -145,7 +184,7 @@ class CD8TcellProjectSteppable(SteppableBasePy):
         
         IL2 = self.field.IL2
         
-        lamR3 = 0.0
+        #lamR3 = 1E-12
         lamR4 = 0.0
         lam1 = 1E-12
         lamT4 = 0.0
@@ -221,63 +260,64 @@ class CD8TcellProjectSteppable(SteppableBasePy):
                         else:
                             cell.sbml.dp['H'] = 0
             
-            # il2_cm = IL2_secretor.amountSeenByCell(cell)/cell.volume
+            il2_cm = IL2_secretor.amountSeenByCell(cell)/cell.volume
             
             # concentrationAtCOM = IL2[int(cell.xCOM), int(cell.yCOM), int(cell.zCOM)]
-            il2_cm = IL2[int(cell.xCOM), int(cell.yCOM), int(cell.zCOM)]
+            # il2_cm = IL2[int(cell.xCOM), int(cell.yCOM), int(cell.zCOM)]
             # print("IL2CM VALUE IS:", il2_cm)
             
             #update ode
             cell.sbml.dp['IL2cm'] = il2_cm
             cell.sbml.dp['fAPC'] = fAPC
             
-            # second term PDE
-            secrete = ( lamR3*(( cell.sbml.dp['IRa'] )/( lamR4 + cell.sbml.dp['IRa'] + small_num)) + lam1 * fAPC ) * ( 1 / (1 + lamT4 * cell.sbml.dp['Tb']) )
-            cell.sbml.dp['secrete'] = secrete
+            if cell.type == self.ACTIVATED:
+                cell.sbml.dp['IL2cm'] = 0.0
             
-            #if cell.type is not self.cell_type.Naive:
-            if cell.type is self.PREACTIVATED or self.ACTIVATED or self.EFFECTOR:
+            # second term PDE
+            secrete = ( cell.dict['lamR3']*(( cell.sbml.dp['IRa'] )/( lamR4 + cell.sbml.dp['IRa'] + small_num)) + lam1 * fAPC ) * ( 1 / (1 + lamT4 * cell.sbml.dp['Tb']) )
+            cell.sbml.dp['secrete'] = secrete/cell.surface
+            
+            if cell.type is not self.cell_type.Naive:
                 # secretion of IL2 by T cells 
                 IL2_secretor.secreteOutsideCellAtBoundary(cell, cell.sbml.dp['secrete'])
                 
-                # Caspase threshold for effector, activated, preactivated
-                # if cell.sbml.dp['C'] > 2.63*Mvox:
-                   # cell.targetVolume = 0.0
+                #Caspase threshold for effector, activated, preactivated
+                #if cell.sbml.dp['C'] > 2.63:
+                 #  cell.targetVolume = 0.0
             
             # step the simulation
             sbml_simulator = self.get_sbml_simulator(model_name='dp', cell=cell)
             sbml_simulator.timestep()
+            
+            # if Tbet threshold reached, A -> E
+            if cell.type == self.ACTIVATED:
+                if cell.sbml.dp['Tb'] > 0.14:
+                    cell.type = self.cell_type.Effector
+            
+
+            # Preactivated cells stop moving until activated
+            if cell.type == self.PREACTIVATED:
+
+                #if not self.cellOI:
+                 #  self.cellOI = cell
+                
+                cell.lambdaVecX = 0.0
+                cell.lambdaVecY = 0.0
+                
+                #if IL2 threshold reached, PA -> A
+                if cell.sbml.dp['IRa'] > 0.0008: #7*Mvox
+                    cell.type = self.ACTIVATED
+                    
+                    #if not self.cellOI:
+                     #   self.cellOI = cell
+                    
+                    cell.dict['lamR3'] = 0.0
             
             # Naive -> PA
             if cell.type == self.NAIVE and fAPC > 0:
                 
                 cell.type = self.cell_type.Preactivated
 
-            # Preactivated cells stop moving until activated
-            if cell.type == self.PREACTIVATED:
-                
-                cell.lambdaVecX = 0.0
-                cell.lambdaVecY = 0.0
-                
-            # if IL2 threshold reached, PA -> A
-            if cell.sbml.dp['IL2cm'] > 7*Mvox:
-                cell.type = self.ACTIVATED
-            
-            # if Tbet threshold reached, A -> E
-            if cell.type == self.ACTIVATED:
-                if cell.sbml.dp['Tb'] > 40 * Mvox:
-                    cell.type = self.cell_type.Effector
-            
-
-            ###### Moved to line 222
-            # second term PDE
-            # secrete = ( lamR3*(( cell.sbml.dp['IRa'] )/( lamR4 + cell.sbml.dp['IRa'] + small_num)) + lam1 * fAPC ) * ( 1 / (1 + lamT4 * cell.sbml.dp['Tb']) )
-            # cell.sbml.dp['secrete'] = secrete
-            
-            # secretion of IL2 by T cells            
-            # if cell.type is not self.NAIVE:
-                # IL2_secretor.secreteOutsideCellAtBoundary(cell, cell.sbml.dp['secrete'])
-            
     def finish(self):
         
         """
