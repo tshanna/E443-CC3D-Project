@@ -9,9 +9,6 @@ ODE_vars = ['IR','IRa','Tb','Fs','Fsa','C']
 
 small_num = sys.float_info.min
 sec_per_mcs = 60
-# 1E-11 # 1E-15 by calculation # 1.0 to remove
-#Mvox = 1E-15
-Mvox = 1.0 
 pi = math.pi
 
 class CD8TcellProjectSteppable(SteppableBasePy):
@@ -19,6 +16,8 @@ class CD8TcellProjectSteppable(SteppableBasePy):
     def __init__(self,frequency=1):
 
         SteppableBasePy.__init__(self,frequency)
+        
+        self.init_pop = 33
 
     def start(self):
         
@@ -34,11 +33,16 @@ class CD8TcellProjectSteppable(SteppableBasePy):
                                                  y_axis_title='Concentration', x_scale_type='linear', y_scale_type='linear',
                                                  grid=False,config_options={'legend': True})
                                                  
-        # self.plot_win3 = self.add_new_plot_window(title='Cell Types', x_axis_title='MCS',
-                                                 # y_axis_title='Number of Cells',config_options={'legend': True})
                                                  
-        self.plot_win3 = self.add_new_plot_window(title='Effector Cells', x_axis_title='MCS',
-                                                 y_axis_title='Number of Cells',config_options={'legend': True})                                              
+        self.plot_win3 = self.add_new_plot_window(title='Effector Cells',
+                                                 x_axis_title='MonteCarlo Step (MCS)',
+                                                 y_axis_title='Concentration', x_scale_type='linear', y_scale_type='linear',
+                                                 grid=False,config_options={'legend': True})                                              
+        
+        self.plot_win4 = self.add_new_plot_window(title='Number of Cells',
+                                                 x_axis_title='MonteCarlo Step (MCS)',
+                                                 y_axis_title='Number of Cells', x_scale_type='linear', y_scale_type='linear',
+                                                 grid=False,config_options={'legend': True}) 
      
         self.plot_win.add_plot("IRa", style='Dots', color='green', size=4)
         self.plot_win.add_plot("Casp", style='Dots', color='cyan', size=4)
@@ -52,17 +56,27 @@ class CD8TcellProjectSteppable(SteppableBasePy):
         self.plot_win2.add_plot("Tb", style='Dots', color='yellow', size=4)
         self.plot_win2.add_plot("Casp", style='Dots', color='cyan', size=4)
         
-        # self.plot_win3.add_plot(plot_name='N',style='Dots', color='cyan',size=4)
-        # self.plot_win3.add_plot(plot_name='APC',style='Dots', color='red',size=4)
-        # self.plot_win3.add_plot(plot_name='A',style='Dots', color='yellow',size=4)
-        # self.plot_win3.add_plot(plot_name='E',style='Dots', color='purple',size=4)
-        # self.plot_win3.add_plot(plot_name='P',style='Dots', color='green',size=4)
         self.plot_win3.add_plot("Casp", style='Dots', color='cyan', size=4)   
-
         
-        """
-        any code in the start function runs before MCS=0
-        """
+        self.plot_win4.add_plot(plot_name='N',style='Lines', color='cyan',size=4)
+        self.plot_win4.add_plot(plot_name='APC',style='Lines', color='red',size=4)
+        self.plot_win4.add_plot(plot_name='A',style='Lines', color='yellow',size=4)
+        self.plot_win4.add_plot(plot_name='E',style='Lines', color='purple',size=4)
+        self.plot_win4.add_plot(plot_name='P',style='Lines', color='green',size=4)
+        self.plot_win4.add_plot(plot_name='T',style='Lines', color='blue',size=4)
+
+    def add_steering_panel(self):
+        self.add_steering_param(name='Initial_Cell_Population', val=33, min_val=4, max_val=100, widget_name='slider')
+        # self.add_steering_param(name='lambda_vol', val=2.0, min_val=0, max_val=10.0, decimal_precision=2, widget_name='slider')
+        # self.add_steering_param(name='lam_vol_enum', val=2.0, min_val=0, max_val=10.0, decimal_precision=2,widget_name='slider')
+
+    def process_steering_panel_data(self):
+        pop_cells = self.get_steering_param('Initial_Cell_Population')
+        # lambda_vol = self.get_steering_param('lambda_vol')
+
+        self.init_pop = pop_cells
+
+    def populate_cells(self):
         
         model_string = """
         
@@ -128,7 +142,7 @@ class CD8TcellProjectSteppable(SteppableBasePy):
         
         #initialize cells throughout the domain
         i = 0
-        while i < 33:
+        while i < self.init_pop:
             x1 = random.sample(range(0,201),1)
             x = x1[0]
             y1 = random.sample(range(0,201),1)
@@ -172,9 +186,11 @@ class CD8TcellProjectSteppable(SteppableBasePy):
                                   model_name='dp',
                                   cell=cell,
                                   step_size=1)
-                
-
+    
     def step(self,mcs):
+        
+        if mcs == 0:
+            self.populate_cells()
         
         if not self.cellOI:
             for cell in self.cell_list_by_type(self.PREACTIVATED):
@@ -213,20 +229,21 @@ class CD8TcellProjectSteppable(SteppableBasePy):
                     # self.plot_win.add_data_point("Casp", mcs, cellOI.sbml.dp['C'])
                     # self.plot_win.add_data_point("Fs", mcs, cellOI.sbml.dp['Fs'])
                     # self.plot_win.add_data_point("Fsa", mcs, cellOI.sbml.dp['Fsa'])
-                    # #self.plot_win.add_data_point("Il2cm", mcs, cellOI.sbml.dp['IL2cm']*1E12)
+                    # #self.plot_win.add_data_point("Il2cm", mcs, cellOI.sbml.dp['IL2cm'])
                     # self.plot_win.add_data_point("fAPC", mcs, cellOI.sbml.dp['fAPC'])
             
                     # self.plot_win2.add_data_point("Tb", mcs, cellOI.sbml.dp['Tb']) 
                 # else:
                     # self.cellOI = None
         
-        # if not mcs % 10 :
-            # self.plot_win3.add_data_point("N", mcs, len(self.cell_list_by_type(self.NAIVE)))
-            # self.plot_win3.add_data_point("P", mcs, len(self.cell_list_by_type(self.PREACTIVATED)))
-            # self.plot_win3.add_data_point("A", mcs, len(self.cell_list_by_type(self.ACTIVATED)))
-            # self.plot_win3.add_data_point("E", mcs, len(self.cell_list_by_type(self.EFFECTOR)))
-            # self.plot_win3.add_data_point("APC", mcs, len(self.cell_list_by_type(self.APC)))
-    
+        if not mcs % 10 :
+            self.plot_win4.add_data_point("N", mcs, len(self.cell_list_by_type(self.NAIVE)))
+            self.plot_win4.add_data_point("P", mcs, len(self.cell_list_by_type(self.PREACTIVATED)))
+            self.plot_win4.add_data_point("A", mcs, len(self.cell_list_by_type(self.ACTIVATED)))
+            self.plot_win4.add_data_point("E", mcs, len(self.cell_list_by_type(self.EFFECTOR)))
+            self.plot_win4.add_data_point("APC", mcs, len(self.cell_list_by_type(self.APC)))
+            self.plot_win4.add_data_point("T", mcs, len(self.cell_list))
+            
         IL2_secretor = self.get_field_secretor('IL2')
         
         IL2 = self.field.IL2
@@ -290,28 +307,24 @@ class CD8TcellProjectSteppable(SteppableBasePy):
                     
                     cell.lambdaVecX = x
                     cell.lambdaVecY = y            
-                
-                # count amount of APC a T cell is in contact with
+
                 fAPC = 0
                 Tbcm = 0
+                cell.sbml.dp['H'] = 0
                 for neighbor, common_surface_area in self.get_cell_neighbor_data_list(cell):
                     if neighbor:
+                        # count amount of APC a T cell is in contact with
                         if neighbor.type == self.APC:
                             fAPC += 1
                         Tbcm += cell.sbml.dp['Tbcm']
-                
-                # track effector-effector or effector-activated contacts (heaviside function H)
-                if cell.type == self.EFFECTOR:
-                    for neighbor, common_surface_area in self.get_cell_neighbor_data_list(cell):
-                        if neighbor:
+                        # track effector-effector or effector-activated contacts (heaviside function H)
+                        if cell.type == self.EFFECTOR:
                             if neighbor.type == self.EFFECTOR or self.ACTIVATED:
                                 cell.sbml.dp['H'] = 1
-                            else:
-                                cell.sbml.dp['H'] = 0
-                
+          
                 il2_cm = IL2_secretor.amountSeenByCell(cell)
 
-                #update ode
+                #update ODE
                 cell.sbml.dp['IL2cm'] = il2_cm
                 cell.sbml.dp['fAPC'] = fAPC
                 cell.sbml.dp['Tbcm'] = Tbcm    
@@ -354,7 +367,7 @@ class CD8TcellProjectSteppable(SteppableBasePy):
         
         # step the simulation
         self.timestep_sbml()            
-
+       
     def finish(self):
         
         """
