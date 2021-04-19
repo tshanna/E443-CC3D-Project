@@ -28,7 +28,6 @@
       <CellType TypeId="3" TypeName="Activated"/>
       <CellType TypeId="4" TypeName="Naive"/>
       <CellType TypeId="5" TypeName="Effector"/>
-      <CellType TypeId="6" TypeName="Dead"/>
    </Plugin>
    
    <Plugin Name="CenterOfMass">
@@ -64,14 +63,7 @@
    <Energy Type1="Naive" Type2="Naive">100.0</Energy>
    <Energy Type1="Naive" Type2="Effector">100.0</Energy>
    <Energy Type1="Effector" Type2="Effector">100.0</Energy>
-   <Energy Type1="Dead" Type2="Medium">10.0</Energy>
-   <Energy Type1="Dead" Type2="APC">30.0</Energy>
-   <Energy Type1="Dead" Type2="Preactivated">30.0</Energy>
-   <Energy Type1="Dead" Type2="Activated">30.0</Energy>
-   <Energy Type1="Dead" Type2="Naive">30.0</Energy>
-   <Energy Type1="Dead" Type2="Effector">30.0</Energy>
-   <Energy Type1="Dead" Type2="Dead">30.0</Energy>
-   <NeighborOrder>2</NeighborOrder>
+   <NeighborOrder>3</NeighborOrder>
 </Plugin>
 
 <Plugin Name="Volume">
